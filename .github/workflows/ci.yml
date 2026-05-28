@@ -1,10 +1,10 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - '**'
   pull_request:
+    branches:
+      - main
+      - develop
   workflow_call:
 
 jobs:
@@ -26,21 +26,12 @@ jobs:
         run: npm ci
 
       - name: Lint commit messages
-        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        if: github.event_name == 'pull_request'
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npx commitlint \
-              --from "${{ github.event.pull_request.base.sha }}" \
-              --to   "${{ github.event.pull_request.head.sha }}" \
-              --verbose
-          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            npx commitlint --last --verbose
-          else
-            npx commitlint \
-              --from "${{ github.event.before }}" \
-              --to   "${{ github.sha }}" \
-              --verbose
-          fi
+          npx commitlint \
+            --from "${{ github.event.pull_request.base.sha }}" \
+            --to   "${{ github.event.pull_request.head.sha }}" \
+            --verbose
 
       - name: Lint, format & type-check
         run: npm run check
