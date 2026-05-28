@@ -1,4 +1,4 @@
-# @trustvc/webhook-events
+# @trustvc/trustvc-chain-events
 
 Self-hosted Docker sidecar that streams TrustVC ETR on-chain events to your system as signed [CloudEvents 1.0](https://cloudevents.io/) webhooks. Every lifecycle change on any ETR token — mint, transfer, surrender, burn — arrives at your endpoint within seconds of chain finality.
 

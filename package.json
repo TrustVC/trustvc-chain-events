@@ -1,5 +1,5 @@
 {
-  "name": "@trustvc/webhook-events",
+  "name": "@trustvc/trustvc-chain-events",
   "version": "0.1.0",
   "description": "Self-hosted webhook sidecar that streams TrustVC ETR on-chain events to downstream endpoints",
   "type": "module",
