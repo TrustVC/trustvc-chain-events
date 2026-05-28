@@ -32,8 +32,8 @@ describe('ChainConfigSchema', () => {
     expect(ChainConfigSchema.safeParse({ ...baseChain, rpcUrl: 'ftp://node.example.com' }).success).toBe(false);
   });
 
-  it('rejects empty registryAddresses array', () => {
-    expect(ChainConfigSchema.safeParse({ ...baseChain, registryAddresses: [] }).success).toBe(false);
+  it('accepts empty registryAddresses array', () => {
+    expect(ChainConfigSchema.safeParse({ ...baseChain, registryAddresses: [] }).success).toBe(true);
   });
 
   it('rejects invalid address format (too short)', () => {

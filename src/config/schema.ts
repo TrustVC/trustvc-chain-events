@@ -15,7 +15,7 @@ export const ChainConfigSchema = z.object({
     ),
   registryAddresses: z
     .array(z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Must be a valid EVM address'))
-    .min(1, 'At least one registry address required'),
+    .default([]),
   pollIntervalMs: z.number().int().positive().optional(),
   replayFromBlock: z.number().int().min(0).optional(),
   replayBatchSize: z.number().int().min(1).max(10_000).default(2_000),

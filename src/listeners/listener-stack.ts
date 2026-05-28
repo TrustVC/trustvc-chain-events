@@ -63,12 +63,20 @@ export class ListenerStack {
     }
     this.currentProvider = provider;
 
-    const factoryAddress = await resolveFactoryAddress(this.chainConfig.registryAddresses, provider);
+    // Nothing to listen to yet.
+    if (this.watchedRegistries.size === 0) {
+      if (!getDb()) {
+        this.log.warn({ chain: this.chainDef.key }, 'No registry addresses configured — add via API or config');
+      }
+      return;
+    }
+
+    const factoryAddress = await resolveFactoryAddress([...this.watchedRegistries], provider);
     this.log.debug({ chain: this.chainDef.key, factory: factoryAddress }, 'WS: resolved factory address');
 
     const pendingListeners = new Map<string, RegistryListener>();
     try {
-      for (const registryAddress of this.chainConfig.registryAddresses) {
+      for (const registryAddress of this.watchedRegistries) {
         if (isAborted()) return;
         const rl = new RegistryListener(
           registryAddress,
