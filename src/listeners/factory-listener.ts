@@ -214,8 +214,15 @@ export class FactoryListener {
         // Read owner/holder/remark from the TokenReceived log in the same transaction.
         void this.readTokenReceivedFromReceipt(norm.transactionHash, escrowAddr).then((extra) => {
           const event = normalizeFactoryEvent(
-            escrowAddr, registryAddr, tokenId, norm, this.chainKey, this.chainId,
-            extra?.owner, extra?.holder, extra?.remark,
+            escrowAddr,
+            registryAddr,
+            tokenId,
+            norm,
+            this.chainKey,
+            this.chainId,
+            extra?.owner,
+            extra?.holder,
+            extra?.remark,
           );
           this.emitter.emit(event).catch((err) => {
             this.log.error({ err, escrow: escrowAddr }, 'Failed to emit escrow_created event');

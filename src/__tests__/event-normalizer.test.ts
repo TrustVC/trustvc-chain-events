@@ -147,10 +147,7 @@ describe('normalizeFactoryEvent', () => {
   });
 
   it('payload includes owner, holder, remark when provided', () => {
-    const ev = normalizeFactoryEvent(
-      '0xEscrow', REGISTRY, 1n, norm, 'ethereum', 1,
-      '0xOwner', '0xHolder', 'issued',
-    );
+    const ev = normalizeFactoryEvent('0xEscrow', REGISTRY, 1n, norm, 'ethereum', 1, '0xOwner', '0xHolder', 'issued');
     expect(ev.data.payload).toMatchObject({
       owner: '0xowner',
       holder: '0xholder',

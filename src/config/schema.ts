@@ -13,9 +13,7 @@ export const ChainConfigSchema = z.object({
         url.startsWith('wss://') || url.startsWith('ws://') || url.startsWith('https://') || url.startsWith('http://'),
       { message: 'rpcUrl must be wss://, ws://, https://, or http://' },
     ),
-  registryAddresses: z
-    .array(z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Must be a valid EVM address'))
-    .default([]),
+  registryAddresses: z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Must be a valid EVM address')).default([]),
   pollIntervalMs: z.number().int().positive().optional(),
   replayFromBlock: z.number().int().min(0).optional(),
   replayBatchSize: z.number().int().min(1).max(10_000).default(2_000),

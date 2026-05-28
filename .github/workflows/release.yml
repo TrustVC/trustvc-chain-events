@@ -1,0 +1,233 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # ── 1. Full CI gate ──────────────────────────────────────────────────────────
+  # Runs the same lint / type-check / build / test steps as the push CI workflow
+  # and captures structured test output for inclusion in the release notes.
+  validate:
+    name: Lint, type-check, build & test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Lint, format & type-check
+        run: npm run check
+
+      - name: Build
+        run: npm run build
+
+      - name: Test (JSON output)
+        run: npx vitest run --reporter=verbose --reporter=json --outputFile=test-results.json
+
+      - name: Build test summary markdown
+        if: always()
+        run: |
+          node - << 'EOF'
+          const fs = require('fs');
+          let r;
+          try { r = JSON.parse(fs.readFileSync('test-results.json', 'utf8')); }
+          catch { fs.writeFileSync('test-summary.md', ''); process.exit(0); }
+
+          const suiteLines = (r.testResults ?? [])
+            .map(s => {
+              const name = s.testFilePath.replace(process.cwd() + '/', '');
+              const icon = s.status === 'passed' ? '✅' : '❌';
+              return `| ${icon} | \`${name}\` | ${s.numPassingTests} / ${s.numPassingTests + s.numFailingTests} |`;
+            });
+
+          const lines = [
+            '### Test Results',
+            '',
+            `| | Count |`,
+            `|---|---|`,
+            `| ✅ Passed | ${r.numPassedTests} |`,
+            `| ❌ Failed | ${r.numFailedTests} |`,
+            `| ⏭ Skipped | ${r.numPendingTests} |`,
+            `| 📋 Total  | ${r.numTotalTests} |`,
+            `| 🗂 Suites | ${r.numTotalTestSuites} |`,
+            '',
+            '<details><summary>Suite breakdown</summary>',
+            '',
+            '| | Suite | Passed / Total |',
+            '|---|---|---|',
+            ...suiteLines,
+            '',
+            '</details>',
+          ];
+          fs.writeFileSync('test-summary.md', lines.join('\n') + '\n');
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-summary
+          path: test-summary.md
+          retention-days: 1
+
+  # ── 2. Auto-version ──────────────────────────────────────────────────────────
+  version:
+    name: Determine next version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+      previous: ${{ steps.next.outputs.previous }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next patch version
+        id: next
+        run: |
+          PREV=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+          if [ -z "$PREV" ]; then
+            NEXT="v0.0.1"
+          else
+            NEXT=$(echo "$PREV" | awk -F'[v.]' '{printf "v%d.%d.%d", $2, $3, $4+1}')
+          fi
+          echo "tag=$NEXT"      >> "$GITHUB_OUTPUT"
+          echo "previous=$PREV" >> "$GITHUB_OUTPUT"
+          echo "Next version: $NEXT (previous: ${PREV:-none})"
+
+  # ── 3. Build, tag & release ──────────────────────────────────────────────────
+  release:
+    name: Build image & publish release
+    needs: [validate, version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create tags + GitHub release
+      packages: write   # push to GHCR
+
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      TAG:  ${{ needs.version.outputs.tag }}
+      PREV: ${{ needs.version.outputs.previous }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-summary
+
+      - name: Generate release notes
+        run: |
+          # Write commits since last tag to a file (||| separator avoids shell quoting issues)
+          if [ -z "$PREV" ]; then
+            git log --pretty=format:"%s|||%H" --no-merges > commits.txt
+          else
+            git log "${PREV}..HEAD" --pretty=format:"%s|||%H" --no-merges > commits.txt
+          fi
+
+          node - << 'SCRIPT'
+          const fs   = require('fs');
+          const tag   = process.env.TAG;
+          const image = process.env.IMAGE;
+          const repo  = process.env.GITHUB_REPOSITORY;
+
+          // Parse commits
+          const raw = fs.readFileSync('commits.txt', 'utf8').trim();
+          const commits = raw
+            ? raw.split('\n').map(l => {
+                const sep = l.lastIndexOf('|||');
+                return { msg: l.slice(0, sep).trim(), sha: l.slice(sep + 3).trim().slice(0, 7) };
+              })
+            : [];
+
+          const groups = { feat: [], fix: [], perf: [], docs: [], chore: [], other: [] };
+          const TYPE = /^(feat|fix|perf|docs|chore|ci|refactor|build|style|test)(\(.+\))?[!:]/;
+          for (const { msg, sha } of commits) {
+            const entry = `${msg} (\`${sha}\`)`;
+            const m = TYPE.exec(msg);
+            const type = m ? m[1] : null;
+            if (type === 'feat')                                          groups.feat.push(entry);
+            else if (type === 'fix')                                      groups.fix.push(entry);
+            else if (type === 'perf')                                     groups.perf.push(entry);
+            else if (type === 'docs')                                     groups.docs.push(entry);
+            else if (['chore','ci','refactor','build','style','test'].includes(type)) groups.chore.push(entry);
+            else                                                          groups.other.push(entry);
+          }
+
+          const section = (title, items) =>
+            items.length ? `### ${title}\n\n${items.map(i => `- ${i}`).join('\n')}\n\n` : '';
+
+          let notes = '## What\'s Changed\n\n';
+          notes += section('✨ New Features',    groups.feat);
+          notes += section('🐛 Bug Fixes',        groups.fix);
+          notes += section('⚡ Performance',      groups.perf);
+          notes += section('📖 Documentation',    groups.docs);
+          notes += section('🔧 Other Changes',    [...groups.chore, ...groups.other]);
+          if (!commits.length) notes += '_No changes since last release._\n\n';
+          notes += '---\n\n';
+
+          // Append test summary
+          try {
+            const summary = fs.readFileSync('test-summary.md', 'utf8').trim();
+            if (summary) notes += summary + '\n\n---\n\n';
+          } catch { /* no artifact */ }
+
+          // Docker block
+          notes += `## Docker Image\n\n`;
+          notes += `\`\`\`bash\ndocker pull ${image}:${tag}\n\`\`\`\n\n`;
+          notes += `Full setup: [README](https://github.com/${repo}/blob/main/README.md)\n`;
+
+          fs.writeFileSync('release-notes.md', notes);
+          SCRIPT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.title=trustvc-webhook-events
+            org.opencontainers.image.version=${{ env.TAG }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create and push release tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ env.TAG }}" -m "Release ${{ env.TAG }}"
+          git push origin "${{ env.TAG }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          body_path: release-notes.md

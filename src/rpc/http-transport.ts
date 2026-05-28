@@ -297,7 +297,14 @@ export class HttpTransport implements ITransport {
     } else if (evLog.eventName === 'PauseWithRemark' || evLog.eventName === 'UnpauseWithRemark') {
       const account = evLog.args[0] as string;
       const remark = evLog.args[1] as string;
-      const event = normalizeRegistryPause(evLog.eventName, account, remark, norm, this.chainDef.key, this.chainDef.chainId);
+      const event = normalizeRegistryPause(
+        evLog.eventName,
+        account,
+        remark,
+        norm,
+        this.chainDef.key,
+        this.chainDef.chainId,
+      );
       eventsReceived.add(1, { chain: this.chainDef.key, event_type: evLog.eventName });
       await this.emitter.emit(event);
     }
