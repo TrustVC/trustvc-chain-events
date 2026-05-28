@@ -49,6 +49,12 @@ export class WsTransport implements ITransport {
 
   async start(): Promise<void> {
     await this.connection.connect();
+    // Wait for the initial DB seed (listenerStack.attach) to complete so that
+    // manager.getStatus() reflects the correct escrow count when the worker
+    // sends its 'ready' IPC message.
+    if (this.attachInFlight) {
+      await this.attachInFlight;
+    }
   }
 
   stop(): void {
