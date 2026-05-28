@@ -1,0 +1,48 @@
+{
+  "_readme": "Copy this file to config.json and fill in your values. Fields marked [OPTIONAL] have defaults and can be removed entirely.",
+
+  "chains": [
+    {
+      "chainKey": "ethereum-sepolia",
+      "rpcUrl": "wss://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}",
+      "registryAddresses": [
+        "0xYourTokenRegistryAddress"
+      ],
+      "replayFromBlock": 6000000,
+      "replayBatchSize": 2000,
+      "replayDelayMs": 0,
+      "confirmations": 1
+    },
+    {
+      "chainKey": "stability-testnet",
+      "rpcUrl": "https://free.testnet.stabilityprotocol.com",
+      "registryAddresses": [
+        "0xYourTokenRegistryAddress"
+      ],
+      "pollIntervalMs": 5000,
+      "replayFromBlock": 0,
+      "replayBatchSize": 2000,
+      "replayDelayMs": 0,
+      "confirmations": 1
+    }
+  ],
+
+  "webhook": {
+    "url": "https://your-system.example.com/trustvc/events",
+    "timeoutMs": 10000,
+    "retryAttempts": 3,
+    "retryBackoffMs": 1000,
+    "headers": {
+      "X-Api-Key": "your-downstream-api-key"
+    },
+    "maxConcurrentDeliveries": 10,
+    "maxQueueSize": 10000
+  },
+  "server": {
+    "port": 8080,
+    "host": "0.0.0.0",
+    "workerProcesses": true
+  },
+
+  "logLevel": "info"
+}

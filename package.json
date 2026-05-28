@@ -1,0 +1,54 @@
+{
+  "name": "@trustvc/webhook-events",
+  "version": "0.1.0",
+  "description": "Self-hosted webhook sidecar that streams TrustVC ETR on-chain events to downstream endpoints",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node --import ./dist/telemetry/instrumentation.js dist/index.js",
+    "dev": "node --env-file=.env --import tsx/esm --import ./src/telemetry/instrumentation.ts --watch src/index.ts",
+    "docker:dev": "docker compose up --build",
+    "docker:prod": "docker compose -f docker-compose.yml up --build",
+    "docker:ha": "docker compose -f docker-compose.ha.yml up --build",
+    "docker:ha:down": "docker compose -f docker-compose.ha.yml down -v",
+    "build": "node scripts/build.mjs",
+    "check": "eslint src && prettier --check \"src/**/*.ts\" && tsc --noEmit",
+    "fix": "eslint src --fix && prettier --write \"src/**/*.ts\"",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.218.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
+    "@opentelemetry/instrumentation-pino": "^0.64.0",
+    "@opentelemetry/sdk-node": "^0.218.0",
+    "ethers": "^6.13.0",
+    "pg": "^8.12.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.0",
+    "pino": "^9.3.0",
+    "pino-pretty": "^11.0.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "esbuild": "^0.23.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
+    "tsx": "^4.22.3",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  }
+}

@@ -1,0 +1,19 @@
+services:
+  trustvc-webhook-events:
+    build:
+      context: .
+      target: dev
+    volumes:
+      - ./package.json:/app/package.json:ro
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./config.json:/app/config.json:ro
+      # use the container's node_modules, not the host's
+      - /app/node_modules
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: development
+      SIGNING_PRIVATE_KEY: ${SIGNING_PRIVATE_KEY:-}
+      CONFIG_PATH: ${CONFIG_PATH:-/app/config.json}

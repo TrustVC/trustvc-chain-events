@@ -1,0 +1,56 @@
+# Horizontal scaling — 3 replicas pointing at your external database.
+#
+# Prerequisites:
+#   1. Fill in DB_HOST, DB_USER, DB_PASSWORD (and optionally DB_NAME, DB_PORT) in .env
+#   2. Fill in SIGNING_PRIVATE_KEY in .env
+#
+# Run:
+#   npm run docker:ha
+#
+# Only one replica will actively poll each chain at a time — the distributed
+# lease in chain_leases ensures the others stand by. If the active replica
+# crashes, a standby steals the lease within DB_LEASE_TTL_MS (default 30 s).
+
+x-webhook-base: &webhook-base
+  build: .
+  volumes:
+    - ./config.json:/app/config.json:ro
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    SIGNING_PRIVATE_KEY: ${SIGNING_PRIVATE_KEY:-}
+    CONFIG_PATH: /app/config.json
+    DB_DIALECT: ${DB_DIALECT:-postgres}
+    DB_HOST: ${DB_HOST}
+    DB_PORT: ${DB_PORT:-5432}
+    DB_NAME: ${DB_NAME:-trustvc}
+    DB_USER: ${DB_USER:-trustvc}
+    DB_PASSWORD: ${DB_PASSWORD}
+    DB_LEASE_TTL_MS: ${DB_LEASE_TTL_MS:-30000}
+  restart: unless-stopped
+  networks:
+    - trustvc-ha
+
+services:
+  # ── Replica 1 (primary candidate) ────────────────────────────────────────────
+  webhook-events-1:
+    <<: *webhook-base
+    ports:
+      - "8080:8080"
+
+  # ── Replica 2 (standby) ──────────────────────────────────────────────────────
+  webhook-events-2:
+    <<: *webhook-base
+    ports:
+      - "8081:8080"
+
+  # ── Replica 3 (standby) ──────────────────────────────────────────────────────
+  webhook-events-3:
+    <<: *webhook-base
+    ports:
+      - "8082:8080"
+
+networks:
+  trustvc-ha:
+    driver: bridge
