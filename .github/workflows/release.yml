@@ -39,17 +39,6 @@ jobs:
           try { r = JSON.parse(fs.readFileSync('test-results.json', 'utf8')); }
           catch { fs.writeFileSync('test-summary.md', ''); process.exit(0); }
 
-          const suiteLines = (r.testResults ?? [])
-            .filter(s => s && (s.testFilePath || s.filepath))
-            .map(s => {
-              const raw = s.testFilePath ?? s.filepath ?? 'unknown';
-              const name = raw.replace(process.cwd() + '/', '');
-              const icon = s.status === 'passed' ? '✅' : '❌';
-              const passed = s.numPassingTests ?? 0;
-              const total  = passed + (s.numFailingTests ?? 0);
-              return `| ${icon} | \`${name}\` | ${passed} / ${total} |`;
-            });
-
           const lines = [
             '### Test Results',
             '',
@@ -60,14 +49,6 @@ jobs:
             `| ⏭ Skipped | ${r.numPendingTests} |`,
             `| 📋 Total  | ${r.numTotalTests} |`,
             `| 🗂 Suites | ${r.numTotalTestSuites} |`,
-            '',
-            '<details><summary>Suite breakdown</summary>',
-            '',
-            '| | Suite | Passed / Total |',
-            '|---|---|---|',
-            ...suiteLines,
-            '',
-            '</details>',
           ];
           fs.writeFileSync('test-summary.md', lines.join('\n') + '\n');
           EOF
