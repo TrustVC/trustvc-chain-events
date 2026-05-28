@@ -18,7 +18,7 @@
     "check": "eslint src && prettier --check \"src/**/*.ts\" && tsc --noEmit",
     "fix": "eslint src --fix && prettier --write \"src/**/*.ts\"",
     "test": "vitest run",
-    "prepare": "husky"
+    "prepare": "node -e \"const {existsSync}=require('fs');if(existsSync('./node_modules/.bin/husky'))require('child_process').execSync('husky',{stdio:'inherit'})\""
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

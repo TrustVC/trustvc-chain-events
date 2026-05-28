@@ -65,12 +65,61 @@ Minimal `config.json`:
 
 ### Step 3 — Run
 
-```bash
-# Docker (recommended)
-npm run docker:prod
+#### Using the published Docker image (recommended)
 
-# Local Node.js
-npm install && npm run dev
+Two things are supplied at runtime — nothing is baked into the image:
+
+| What | How |
+|---|---|
+| `config.json` (chains, RPC URLs, webhook) | Volume mount |
+| Secrets (`SIGNING_PRIVATE_KEY`, DB creds, etc.) | `.env` file or `-e` flags |
+
+**Option A — env file (simplest)**
+
+```bash
+docker run -d \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  --env-file .env \
+  -p 8080:8080 \
+  ghcr.io/trustvc/trustvc-chain-events:latest
+```
+
+**Option B — inline flags**
+
+```bash
+docker run -d \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -e SIGNING_PRIVATE_KEY="$(cat private.pem)" \
+  -e DB_HOST=your-postgres-host \
+  -e DB_PASSWORD=secret \
+  -p 8080:8080 \
+  ghcr.io/trustvc/trustvc-chain-events:latest
+```
+
+**Option C — Docker Compose**
+
+```yaml
+services:
+  webhook-events:
+    image: ghcr.io/trustvc/trustvc-chain-events:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.json:/app/config.json:ro
+    env_file:
+      - .env
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
+```
+
+#### Building from source
+
+```bash
+npm run docker:prod   # build and run via Docker Compose
+npm install && npm run dev   # local Node.js watch mode
 ```
 
 Confirm it is running:
