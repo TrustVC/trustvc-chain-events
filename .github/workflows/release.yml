@@ -115,7 +115,6 @@ jobs:
       packages: write   # push to GHCR
 
     env:
-      IMAGE: ghcr.io/${{ github.repository }}
       TAG:  ${{ needs.version.outputs.tag }}
       PREV: ${{ needs.version.outputs.previous }}
 
@@ -123,6 +122,9 @@ jobs:
       - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
+
+      - name: Set lowercase image name
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - uses: actions/download-artifact@v8.0.1
         with:
