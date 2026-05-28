@@ -40,10 +40,14 @@ jobs:
           catch { fs.writeFileSync('test-summary.md', ''); process.exit(0); }
 
           const suiteLines = (r.testResults ?? [])
+            .filter(s => s && (s.testFilePath || s.filepath))
             .map(s => {
-              const name = s.testFilePath.replace(process.cwd() + '/', '');
+              const raw = s.testFilePath ?? s.filepath ?? 'unknown';
+              const name = raw.replace(process.cwd() + '/', '');
               const icon = s.status === 'passed' ? '✅' : '❌';
-              return `| ${icon} | \`${name}\` | ${s.numPassingTests} / ${s.numPassingTests + s.numFailingTests} |`;
+              const passed = s.numPassingTests ?? 0;
+              const total  = passed + (s.numFailingTests ?? 0);
+              return `| ${icon} | \`${name}\` | ${passed} / ${total} |`;
             });
 
           const lines = [
