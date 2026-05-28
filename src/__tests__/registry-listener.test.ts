@@ -153,7 +153,7 @@ describe('RegistryListener', () => {
     mockPause.mockReturnValue(makeCloudEvent('com.trustvc.etr.registry_paused'));
     const listener = makeListener(1);
     listener.start();
-    getHandler()('maintenance', makePayload('PauseWithRemark'));
+    getHandler()('0xaccount', 'maintenance', makePayload('PauseWithRemark'));
     await flush();
     expect(mockEmitter.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'com.trustvc.etr.registry_paused' }));
   });
@@ -162,7 +162,7 @@ describe('RegistryListener', () => {
     mockPause.mockReturnValue(makeCloudEvent('com.trustvc.etr.registry_unpaused'));
     const listener = makeListener(1);
     listener.start();
-    getHandler()('', makePayload('UnpauseWithRemark'));
+    getHandler()('0xaccount', '', makePayload('UnpauseWithRemark'));
     await flush();
     expect(mockEmitter.emit).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'com.trustvc.etr.registry_unpaused' }),

@@ -1,7 +1,7 @@
 export const REGISTRY_ABI = [
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
-  'event PauseWithRemark(bytes remark)',
-  'event UnpauseWithRemark(bytes remark)',
+  'event PauseWithRemark(address account, bytes remark)',
+  'event UnpauseWithRemark(address account, bytes remark)',
   'function titleEscrowFactory() view returns (address)',
 ];
 

@@ -1,6 +1,6 @@
-import { Contract, type ContractEventPayload, type Provider } from 'ethers';
+import { Contract, Interface, type ContractEventPayload, type Provider } from 'ethers';
 import type { Logger } from 'pino';
-import { FACTORY_ABI } from '../contracts/abis.js';
+import { FACTORY_ABI, ESCROW_ABI } from '../contracts/abis.js';
 import { isEventLog } from '../contracts/event-log.js';
 import { normalizeFactoryEvent } from '../delivery/event-normalizer.js';
 import { EscrowListener } from './escrow-listener.js';
@@ -10,6 +10,8 @@ import { toNormalizedLog } from '../utils/eth.js';
 import type { AttachAbortFn } from './listener-stack.js';
 import { getDb } from '../db/connection.js';
 import { saveEscrow, markShredded } from '../db/repositories/escrow-repo.js';
+
+const ESCROW_IFACE = new Interface(ESCROW_ABI);
 
 // Persisted across reconnects so historical escrows are re-attached without a full replay.
 export interface KnownEscrow {
@@ -170,6 +172,35 @@ export class FactoryListener {
     return null;
   }
 
+  private async readTokenReceivedFromReceipt(
+    txHash: string,
+    escrowAddr: string,
+  ): Promise<{ owner: string; holder: string; remark: string } | null> {
+    try {
+      const receipt = await this.provider.getTransactionReceipt(txHash);
+      if (!receipt) return null;
+      const escrowLower = escrowAddr.toLowerCase();
+      for (const log of receipt.logs) {
+        if (log.address.toLowerCase() !== escrowLower) continue;
+        try {
+          const parsed = ESCROW_IFACE.parseLog({ topics: [...log.topics], data: log.data });
+          if (parsed?.name === 'TokenReceived') {
+            return {
+              owner: (parsed.args[0] as string).toLowerCase(),
+              holder: (parsed.args[1] as string).toLowerCase(),
+              remark: parsed.args[5] as string,
+            };
+          }
+        } catch {
+          // not a TokenReceived log — try next
+        }
+      }
+    } catch {
+      // receipt unavailable
+    }
+    return null;
+  }
+
   private subscribeToNewEscrows(): void {
     this.contract.on(
       'TitleEscrowCreated',
@@ -180,9 +211,15 @@ export class FactoryListener {
           { chain: this.chainKey, escrow: escrowAddr, tokenId: tokenId.toString(), block: norm.blockNumber },
           'New escrow detected — attaching listener',
         );
-        const event = normalizeFactoryEvent(escrowAddr, registryAddr, tokenId, norm, this.chainKey, this.chainId);
-        this.emitter.emit(event).catch((err) => {
-          this.log.error({ err, escrow: escrowAddr }, 'Failed to emit escrow_created event');
+        // Read owner/holder/remark from the TokenReceived log in the same transaction.
+        void this.readTokenReceivedFromReceipt(norm.transactionHash, escrowAddr).then((extra) => {
+          const event = normalizeFactoryEvent(
+            escrowAddr, registryAddr, tokenId, norm, this.chainKey, this.chainId,
+            extra?.owner, extra?.holder, extra?.remark,
+          );
+          this.emitter.emit(event).catch((err) => {
+            this.log.error({ err, escrow: escrowAddr }, 'Failed to emit escrow_created event');
+          });
         });
         this.attachEscrowListener(escrowAddr, registryAddr, tokenId);
         if (getDb()) {

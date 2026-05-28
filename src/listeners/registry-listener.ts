@@ -46,12 +46,14 @@ export class RegistryListener {
           void this.emitAfterConfirmations(norm.transactionHash, event, 'registry transfer');
         }
       } else if (eventName === 'PauseWithRemark') {
-        const remark = args[0] as string;
-        const event = normalizeRegistryPause('PauseWithRemark', remark, norm, this.chainKey, this.chainId);
+        const account = args[0] as string;
+        const remark = args[1] as string;
+        const event = normalizeRegistryPause('PauseWithRemark', account, remark, norm, this.chainKey, this.chainId);
         void this.emitAfterConfirmations(norm.transactionHash, event, 'pause');
       } else if (eventName === 'UnpauseWithRemark') {
-        const remark = args[0] as string;
-        const event = normalizeRegistryPause('UnpauseWithRemark', remark, norm, this.chainKey, this.chainId);
+        const account = args[0] as string;
+        const remark = args[1] as string;
+        const event = normalizeRegistryPause('UnpauseWithRemark', account, remark, norm, this.chainKey, this.chainId);
         void this.emitAfterConfirmations(norm.transactionHash, event, 'unpause');
       }
     });

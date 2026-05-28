@@ -9,7 +9,12 @@ import { isEventLog } from '../contracts/event-log.js';
 import type { IWebhookEmitter } from '../interfaces/emitter.js';
 
 // ---- Module mocks ----
-vi.mock('ethers', () => ({ Contract: vi.fn() }));
+vi.mock('ethers', () => ({
+  Contract: vi.fn(),
+  Interface: vi.fn(() => ({
+    parseLog: vi.fn().mockReturnValue(null),
+  })),
+}));
 vi.mock('../listeners/escrow-listener.js', () => ({
   EscrowListener: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
 }));

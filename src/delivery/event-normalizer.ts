@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { CloudEvent, NormalizedLog } from '../interfaces/cloud-event.js';
-import { hexToUtf8 } from '../utils/eth.js';
 
 const BURN_ADDRESS = '0x000000000000000000000000000000000000dEaD';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -47,23 +46,25 @@ export function normalizeRegistryTransfer(
   const to = raw.to.toLowerCase();
   const registryAddress = norm.address.toLowerCase();
 
+  const tokenId = raw.tokenId.toString();
   if (from === ZERO_ADDRESS.toLowerCase()) {
-    return toCloudEvent('etr.minted', chainKey, chainId, registryAddress, raw.tokenId, norm, { to });
+    return toCloudEvent('etr.minted', chainKey, chainId, registryAddress, raw.tokenId, norm, { to, tokenId });
   }
   if (to === BURN_ADDRESS.toLowerCase()) {
-    return toCloudEvent('etr.burned', chainKey, chainId, registryAddress, raw.tokenId, norm, { from });
+    return toCloudEvent('etr.burned', chainKey, chainId, registryAddress, raw.tokenId, norm, { from, tokenId });
   }
   if (to === registryAddress) {
-    return toCloudEvent('etr.surrendered', chainKey, chainId, registryAddress, raw.tokenId, norm, { from });
+    return toCloudEvent('etr.surrendered', chainKey, chainId, registryAddress, raw.tokenId, norm, { from, tokenId });
   }
   if (from === registryAddress) {
-    return toCloudEvent('etr.restored', chainKey, chainId, registryAddress, raw.tokenId, norm, { to });
+    return toCloudEvent('etr.restored', chainKey, chainId, registryAddress, raw.tokenId, norm, { to, tokenId });
   }
   return null;
 }
 
 export function normalizeRegistryPause(
   eventName: 'PauseWithRemark' | 'UnpauseWithRemark',
+  account: string,
   remark: string,
   norm: NormalizedLog,
   chainKey: string,
@@ -87,7 +88,7 @@ export function normalizeRegistryPause(
       transactionHash: norm.transactionHash,
       logIndex: norm.logIndex,
       idempotencyKey: `${chainId}-${norm.transactionHash}-${norm.logIndex}`,
-      payload: { remark: hexToUtf8(remark) },
+      payload: { account: account.toLowerCase(), remark },
     },
   };
 }
@@ -99,11 +100,18 @@ export function normalizeFactoryEvent(
   norm: NormalizedLog,
   chainKey: string,
   chainId: number,
+  owner?: string,
+  holder?: string,
+  remark?: string,
 ): CloudEvent {
-  return toCloudEvent('etr.escrow_created', chainKey, chainId, registryAddress.toLowerCase(), tokenId, norm, {
+  const payload: Record<string, unknown> = {
     escrowAddress: escrowAddress.toLowerCase(),
     registryAddress: registryAddress.toLowerCase(),
-  });
+  };
+  if (owner !== undefined) payload.owner = owner.toLowerCase();
+  if (holder !== undefined) payload.holder = holder.toLowerCase();
+  if (remark !== undefined) payload.remark = remark;
+  return toCloudEvent('etr.escrow_created', chainKey, chainId, registryAddress.toLowerCase(), tokenId, norm, payload);
 }
 
 export function normalizeEscrowEvent(

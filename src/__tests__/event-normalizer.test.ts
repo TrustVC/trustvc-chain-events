@@ -96,26 +96,38 @@ describe('normalizeRegistryTransfer', () => {
     const ev = normalizeRegistryTransfer({ from: ZERO, to: HOLDER, tokenId: 1n }, norm, 'ethereum', 1);
     expect(ev?.type).toMatch(/^com\.trustvc\.etr\./);
   });
+
+  it('tokenId is included in payload as string', () => {
+    const ev = normalizeRegistryTransfer({ from: ZERO, to: HOLDER, tokenId: 42n }, norm, 'ethereum', 1);
+    expect((ev?.data.payload as { tokenId: string }).tokenId).toBe('42');
+  });
 });
 
 describe('normalizeRegistryPause', () => {
+  const ACCOUNT = '0xABCDABCDABCDABCDABCDABCDABCDABCDABCDABCD';
+
   it('PauseWithRemark → etr.registry_paused', () => {
-    const ev = normalizeRegistryPause('PauseWithRemark', 'maintenance', norm, 'ethereum', 1);
+    const ev = normalizeRegistryPause('PauseWithRemark', ACCOUNT, 'maintenance', norm, 'ethereum', 1);
     expect(ev.type).toBe('com.trustvc.etr.registry_paused');
   });
 
   it('UnpauseWithRemark → etr.registry_unpaused', () => {
-    const ev = normalizeRegistryPause('UnpauseWithRemark', '', norm, 'ethereum', 1);
+    const ev = normalizeRegistryPause('UnpauseWithRemark', ACCOUNT, '', norm, 'ethereum', 1);
     expect(ev.type).toBe('com.trustvc.etr.registry_unpaused');
   });
 
+  it('account is lowercased in payload', () => {
+    const ev = normalizeRegistryPause('PauseWithRemark', ACCOUNT, '', norm, 'ethereum', 1);
+    expect((ev.data.payload as { account: string }).account).toBe(ACCOUNT.toLowerCase());
+  });
+
   it('remark is included in payload', () => {
-    const ev = normalizeRegistryPause('PauseWithRemark', 'audit', norm, 'ethereum', 1);
+    const ev = normalizeRegistryPause('PauseWithRemark', ACCOUNT, 'audit', norm, 'ethereum', 1);
     expect((ev.data.payload as { remark: string }).remark).toBe('audit');
   });
 
   it('subject is registry address not tokenId', () => {
-    const ev = normalizeRegistryPause('PauseWithRemark', '', norm, 'ethereum', 1);
+    const ev = normalizeRegistryPause('PauseWithRemark', ACCOUNT, '', norm, 'ethereum', 1);
     expect(ev.subject).toBe(REGISTRY.toLowerCase());
   });
 });
@@ -126,12 +138,31 @@ describe('normalizeFactoryEvent', () => {
     expect(ev.type).toBe('com.trustvc.etr.escrow_created');
   });
 
-  it('payload includes both escrowAddress and registryAddress', () => {
+  it('payload includes escrowAddress and registryAddress', () => {
     const ev = normalizeFactoryEvent('0xEscrow', REGISTRY, 1n, norm, 'ethereum', 1);
     expect(ev.data.payload).toMatchObject({
       escrowAddress: '0xescrow',
       registryAddress: REGISTRY.toLowerCase(),
     });
+  });
+
+  it('payload includes owner, holder, remark when provided', () => {
+    const ev = normalizeFactoryEvent(
+      '0xEscrow', REGISTRY, 1n, norm, 'ethereum', 1,
+      '0xOwner', '0xHolder', 'issued',
+    );
+    expect(ev.data.payload).toMatchObject({
+      owner: '0xowner',
+      holder: '0xholder',
+      remark: 'issued',
+    });
+  });
+
+  it('omits owner/holder/remark when not provided', () => {
+    const ev = normalizeFactoryEvent('0xescrow', REGISTRY, 1n, norm, 'ethereum', 1);
+    expect(ev.data.payload).not.toHaveProperty('owner');
+    expect(ev.data.payload).not.toHaveProperty('holder');
+    expect(ev.data.payload).not.toHaveProperty('remark');
   });
 });
 
@@ -164,6 +195,11 @@ describe('normalizeEscrowEvent', () => {
   it('args are passed through as payload', () => {
     const args = { fromHolder: '0xaaa', toHolder: '0xbbb' };
     const ev = normalizeEscrowEvent('HolderTransfer', args, 1n, REGISTRY, escrowNorm, 'ethereum', 1);
-    expect(ev?.data.payload).toEqual(args);
+    expect(ev?.data.payload).toMatchObject(args);
+  });
+
+  it('remark is passed through as-is', () => {
+    const ev = normalizeEscrowEvent('TokenReceived', { remark: '0x6d696e74' }, 1n, REGISTRY, escrowNorm, 'ethereum', 1);
+    expect((ev?.data.payload as Record<string, unknown>).remark).toBe('0x6d696e74');
   });
 });
