@@ -15,7 +15,7 @@ import { loadRegistries } from '../db/repositories/registry-repo.js';
 export type AttachAbortFn = () => boolean;
 
 export class ListenerStack {
-  private registryListeners: RegistryListener[] = [];
+  private readonly registryListeners = new Map<string, RegistryListener>();
   private factoryListener: FactoryListener | null = null;
   private readonly knownEscrows = new Map<string, KnownEscrow>();
   private lastHistoricalReplayBlock: number | null = null;
@@ -66,7 +66,7 @@ export class ListenerStack {
     const factoryAddress = await resolveFactoryAddress(this.chainConfig.registryAddresses, provider);
     this.log.debug({ chain: this.chainDef.key, factory: factoryAddress }, 'WS: resolved factory address');
 
-    const registryListeners: RegistryListener[] = [];
+    const pendingListeners = new Map<string, RegistryListener>();
     try {
       for (const registryAddress of this.chainConfig.registryAddresses) {
         if (isAborted()) return;
@@ -80,7 +80,7 @@ export class ListenerStack {
           this.chainConfig.confirmations,
         );
         rl.start();
-        registryListeners.push(rl);
+        pendingListeners.set(registryAddress.toLowerCase(), rl);
       }
 
       if (isAborted()) return;
@@ -107,7 +107,7 @@ export class ListenerStack {
       await fl.start(isAborted);
       if (isAborted()) return;
 
-      this.registryListeners = registryListeners;
+      for (const [key, rl] of pendingListeners) this.registryListeners.set(key, rl);
       this.factoryListener = fl;
       const replayedThrough = fl.getReplayedThroughBlock();
       if (replayedThrough !== null) {
@@ -134,7 +134,7 @@ export class ListenerStack {
         this.chainConfig.confirmations,
       );
       rl.start();
-      this.registryListeners.push(rl);
+      this.registryListeners.set(key, rl);
     }
     if (this.factoryListener) {
       // addWatchedRegistry owns adding to watchedRegistries + running the historical replay.
@@ -148,11 +148,23 @@ export class ListenerStack {
     }
   }
 
+  removeRegistry(address: string): void {
+    const key = address.toLowerCase();
+    const rl = this.registryListeners.get(key);
+    if (rl) {
+      rl.stop();
+      this.registryListeners.delete(key);
+    }
+    this.factoryListener?.removeWatchedRegistry(key);
+    this.watchedRegistries.delete(key);
+  }
+
   detach(): void {
-    for (const rl of this.registryListeners) rl.stop();
-    this.registryListeners = [];
+    for (const rl of this.registryListeners.values()) rl.stop();
+    this.registryListeners.clear();
     this.factoryListener?.stop();
     this.factoryListener = null;
+    this.currentProvider = null;
   }
 
   get activeEscrowCount(): number {

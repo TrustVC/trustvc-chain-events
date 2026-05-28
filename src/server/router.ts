@@ -18,7 +18,7 @@ export function createRouter(
     } else if (method === 'GET' && url === '/registries') {
       await handleGetRegistries(res, orchestrator);
     } else if (method === 'DELETE' && url?.startsWith('/registry/')) {
-      await handleDeleteRegistry(req, res);
+      await handleDeleteRegistry(req, res, orchestrator);
     } else {
       res.writeHead(404);
       res.end();

@@ -6,4 +6,5 @@ export interface ITransport {
   getState(): ProviderState;
   activeEscrowCount: number;
   addRegistry(address: string, fromBlock: number): Promise<void>;
+  removeRegistry(address: string): void;
 }

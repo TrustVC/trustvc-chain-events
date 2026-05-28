@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import pino from 'pino';
 import pretty from 'pino-pretty';
 import { createSigningKeyManager } from './signing/signing-key.js';
@@ -35,7 +36,15 @@ const log = pino(
   }),
 );
 
-log.info({ version: process.env['npm_package_version'] ?? 'unknown' }, 'trustvc-webhook-events starting');
+let startupVersion = process.env['npm_package_version'] ?? 'unknown';
+try {
+  startupVersion = (
+    JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
+  ).version;
+} catch {
+  /* keep fallback */
+}
+log.info({ version: startupVersion }, 'trustvc-webhook-events starting');
 
 // Log unexpected rejections rather than silently swallowing them.
 // Provider-destroyed errors are expected during reconnection and suppressed.

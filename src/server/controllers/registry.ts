@@ -40,9 +40,10 @@ export async function handlePostRegistry(
     await orchestrator.addRegistry(chainKey, address, fromBlock);
     sendJson(res, 200, { chainKey, address, fromBlock });
   } catch (err) {
+    const code = (err as { statusCode?: number }).statusCode ?? 500;
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ err: msg }, 'POST /registry failed');
-    sendJson(res, 500, { error: msg });
+    sendJson(res, code, { error: msg });
   }
 }
 
@@ -59,8 +60,13 @@ export async function handleGetRegistries(res: ServerResponse, orchestrator: Cha
   sendJson(res, 200, result);
 }
 
-export async function handleDeleteRegistry(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const parts = req.url!.split('/');
+export async function handleDeleteRegistry(
+  req: IncomingMessage,
+  res: ServerResponse,
+  orchestrator: ChainOrchestrator,
+): Promise<void> {
+  const pathname = req.url!.split('?')[0]!;
+  const parts = pathname.split('/');
   const chainKey = parts[2];
   const address = parts[3]?.toLowerCase();
 
@@ -73,5 +79,6 @@ export async function handleDeleteRegistry(req: IncomingMessage, res: ServerResp
     return;
   }
   await removeRegistry(chainKey, address);
+  await orchestrator.removeRegistry(chainKey, address);
   sendJson(res, 200, { chainKey, address, active: false });
 }

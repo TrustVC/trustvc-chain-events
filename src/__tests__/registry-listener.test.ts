@@ -146,7 +146,7 @@ describe('RegistryListener', () => {
     listener.start();
     getHandler()(ZERO, HOLDER, 1n, makePayload('Transfer'));
     await flush(6);
-    expect(m.waitForTransaction).toHaveBeenCalledWith('0xtx', 2);
+    expect(m.waitForTransaction).toHaveBeenCalledWith('0xtx', 2, 120_000);
   });
 
   it('emits etr.registry_paused on PauseWithRemark', async () => {

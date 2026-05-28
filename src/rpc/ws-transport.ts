@@ -75,4 +75,8 @@ export class WsTransport implements ITransport {
   async addRegistry(address: string, fromBlock: number): Promise<void> {
     await this.listenerStack.addRegistry(address, fromBlock);
   }
+
+  removeRegistry(address: string): void {
+    this.listenerStack.removeRegistry(address);
+  }
 }

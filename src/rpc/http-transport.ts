@@ -203,6 +203,18 @@ export class HttpTransport implements ITransport {
     }
   }
 
+  removeRegistry(address: string): void {
+    const key = address.toLowerCase();
+    this.watchedRegistries.delete(key);
+    this.registryContracts.delete(key);
+    // Drop all in-memory escrows belonging to this registry so they are no longer polled.
+    for (const [escrowKey, info] of this.seenEscrows) {
+      if (info.registryAddr.toLowerCase() === key) {
+        this.seenEscrows.delete(escrowKey);
+      }
+    }
+  }
+
   // ── Poll loop ─────────────────────────────────────────────────────────────────
 
   private schedulePoll(): void {
@@ -239,10 +251,12 @@ export class HttpTransport implements ITransport {
   // then escrow events on all currently known escrows.
   // Called once per poll tick — typically covers only a handful of new blocks.
   private async processNewBlocks(from: number, to: number): Promise<void> {
-    for (const [, contract] of this.registryContracts) {
-      await this.processRegistryLogs(contract, from, to);
-    }
-    await this.scanFactoryRange(from, to, false);
+    // All registries and factory scan run in parallel; escrow logs follow after
+    // so newly-discovered escrows from scanFactoryRange are included.
+    await Promise.all([
+      ...[...this.registryContracts.values()].map((c) => this.processRegistryLogs(c, from, to)),
+      this.scanFactoryRange(from, to, false),
+    ]);
     await this.processEscrowLogs(from, to);
   }
 
@@ -252,13 +266,20 @@ export class HttpTransport implements ITransport {
     const unpauseFn = contract.filters['UnpauseWithRemark'];
     if (!transferFn || !pauseFn || !unpauseFn) return;
 
-    for (const filterFn of [transferFn, pauseFn, unpauseFn]) {
-      const logs = await this.queryFilterWithRetry(contract, filterFn, fromBlock, toBlock);
-      if (!logs) continue;
-      for (const evLog of logs) {
-        if (!isEventLog(evLog)) continue;
-        await this.processRegistryLog(evLog);
-      }
+    // Fetch all three event types in parallel — one eth_getLogs per filter.
+    const [transferLogs, pauseLogs, unpauseLogs] = await Promise.all([
+      this.queryFilterWithRetry(contract, transferFn, fromBlock, toBlock),
+      this.queryFilterWithRetry(contract, pauseFn, fromBlock, toBlock),
+      this.queryFilterWithRetry(contract, unpauseFn, fromBlock, toBlock),
+    ]);
+
+    // Merge and sort by block/logIndex so downstream ordering is deterministic.
+    const allLogs = [...(transferLogs ?? []), ...(pauseLogs ?? []), ...(unpauseLogs ?? [])];
+    allLogs.sort((a, b) => a.blockNumber - b.blockNumber || (a as EventLog).index - (b as EventLog).index);
+
+    for (const evLog of allLogs) {
+      if (!isEventLog(evLog)) continue;
+      await this.processRegistryLog(evLog);
     }
   }
 
@@ -285,7 +306,8 @@ export class HttpTransport implements ITransport {
   // silent=true: only update seenEscrows, no webhooks (used during index build).
   // silent=false: also emit escrow_created webhook for each new escrow.
   private async scanFactoryRange(fromBlock: number, toBlock: number, silent: boolean): Promise<void> {
-    const filterFn = this.factoryContract!.filters['TitleEscrowCreated'];
+    if (!this.factoryContract) return;
+    const filterFn = this.factoryContract.filters['TitleEscrowCreated'];
     if (!filterFn) return;
 
     const logs = await this.queryFilterWithRetry(this.factoryContract!, filterFn, fromBlock, toBlock);

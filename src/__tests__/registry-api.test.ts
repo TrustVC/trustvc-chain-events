@@ -64,6 +64,7 @@ function makeOrchestrator(overrides: Partial<ChainOrchestrator> = {}): ChainOrch
     ],
     verifyRegistry: vi.fn().mockResolvedValue(undefined),
     addRegistry: vi.fn().mockResolvedValue(undefined),
+    removeRegistry: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as ChainOrchestrator;
 }

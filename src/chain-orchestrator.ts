@@ -46,9 +46,15 @@ export class ChainOrchestrator {
   // Per-chain child processes (used when workerProcesses=true)
   private chainProcesses = new Map<string, ChainProcess>();
 
+  // Pending addRegistry acks: address → list of resolve callbacks waiting for worker confirmation.
+  private readonly pendingRegistryAdds = new Map<string, Array<() => void>>();
+  // Pending removeRegistry acks: address → list of resolve callbacks.
+  private readonly pendingRegistryRemoves = new Map<string, Array<() => void>>();
+
   // Distributed lease state (active only when DB_HOST is set)
   private readonly holderId = `${hostname()}-${process.pid}`;
   private readonly heldLeases = new Set<string>();
+  private readonly failedChains = new Set<string>(); // chains permanently failed on this replica — don't retry
   private leaseRenewalTimer: ReturnType<typeof setInterval> | null = null;
   // Cached worker path so the lease watcher can spawn workers on failover.
   private workerPath: string | null = null;
@@ -121,9 +127,37 @@ export class ChainOrchestrator {
     }, interval);
   }
 
+  private isChainFailed(chainKey: string): boolean {
+    if (this.config.server.workerProcesses) {
+      return this.chainProcesses.get(chainKey)?.status.providerState.status === 'failed';
+    }
+    return this.managers.find((m) => m.chainKey === chainKey)?.getStatus().providerState.status === 'failed';
+  }
+
   private async tickLeases(): Promise<void> {
     // 1. Renew leases we hold; stop the chain immediately if we lost one.
+    //    If the chain is permanently failed, release the lease so another replica
+    //    can take over — prevents a dead chain from holding its lease indefinitely.
     for (const chainKey of [...this.heldLeases]) {
+      const isFailed = this.isChainFailed(chainKey);
+      if (isFailed) {
+        this.log.warn({ chain: chainKey }, 'Chain permanently failed — releasing lease for failover');
+        this.failedChains.add(chainKey);
+        this.heldLeases.delete(chainKey);
+        void releaseLease(chainKey, this.holderId);
+        const idx = this.managers.findIndex((m) => m.chainKey === chainKey);
+        if (idx >= 0) {
+          this.managers[idx].stop();
+          this.managers.splice(idx, 1);
+        }
+        const cp = this.chainProcesses.get(chainKey);
+        if (cp) {
+          this.chainProcesses.delete(chainKey);
+          cp.proc.send({ type: 'stop' } as IpcParentMessage);
+        }
+        continue;
+      }
+
       const stillHeld = await renewLease(chainKey, this.holderId);
       if (!stillHeld) {
         this.log.warn({ chain: chainKey }, 'Lease lost to another instance — stopping chain');
@@ -147,7 +181,7 @@ export class ChainOrchestrator {
     //    Covers two scenarios: initial standby replicas and failover after crash.
     for (const chainConfig of this.config.chains) {
       const chainDef = CHAIN_CATALOG_BY_KEY.get(chainConfig.chainKey);
-      if (!chainDef || this.heldLeases.has(chainDef.key)) continue;
+      if (!chainDef || this.heldLeases.has(chainDef.key) || this.failedChains.has(chainDef.key)) continue;
 
       const acquired = await acquireLease(chainDef.key, this.holderId);
       if (!acquired) continue;
@@ -257,6 +291,18 @@ export class ChainOrchestrator {
         } else if (msg.type === 'error') {
           this.log.error({ chain: chainDef.key, err: msg.message }, 'Chain worker startup error');
           resolve(); // resolve so allSettled doesn't hang; worker may auto-restart
+        } else if (msg.type === 'registryAdded') {
+          const resolvers = this.pendingRegistryAdds.get(msg.address);
+          if (resolvers?.length) {
+            this.pendingRegistryAdds.delete(msg.address);
+            for (const fn of resolvers) fn();
+          }
+        } else if (msg.type === 'registryRemoved') {
+          const resolvers = this.pendingRegistryRemoves.get(msg.address);
+          if (resolvers?.length) {
+            this.pendingRegistryRemoves.delete(msg.address);
+            for (const fn of resolvers) fn();
+          }
         }
       });
 
@@ -345,7 +391,26 @@ export class ChainOrchestrator {
         this.log.warn({ chain: chainKey }, 'addRegistry: no active worker for chain');
         return;
       }
-      cp.proc.send({ type: 'addRegistry', address, fromBlock } as IpcParentMessage);
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            this.log.warn({ chain: chainKey, address }, 'addRegistry: worker ack timed out after 30 s — continuing');
+            resolve();
+          }
+        }, 30_000);
+        const existing = this.pendingRegistryAdds.get(address) ?? [];
+        existing.push(() => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+          }
+        });
+        this.pendingRegistryAdds.set(address, existing);
+        cp.proc.send({ type: 'addRegistry', address, fromBlock } as IpcParentMessage);
+      });
     } else {
       const manager = this.managers.find((m) => m.chainKey === chainKey);
       if (!manager) {
@@ -354,6 +419,36 @@ export class ChainOrchestrator {
       }
       await manager.addRegistry(address, fromBlock);
     }
+  }
+
+  removeRegistry(chainKey: string, address: string): Promise<void> {
+    if (this.config.server.workerProcesses) {
+      const cp = this.chainProcesses.get(chainKey);
+      if (!cp) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            this.log.warn({ chain: chainKey, address }, 'removeRegistry: worker ack timed out after 10 s');
+            resolve();
+          }
+        }, 10_000);
+        const existing = this.pendingRegistryRemoves.get(address) ?? [];
+        existing.push(() => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+          }
+        });
+        this.pendingRegistryRemoves.set(address, existing);
+        cp.proc.send({ type: 'removeRegistry', address } as IpcParentMessage);
+      });
+    }
+    const manager = this.managers.find((m) => m.chainKey === chainKey);
+    manager?.removeRegistry(address);
+    return Promise.resolve();
   }
 
   // Validates address format then calls titleEscrowFactory() on-chain to confirm

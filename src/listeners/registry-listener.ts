@@ -61,9 +61,14 @@ export class RegistryListener {
 
   // Waits for the required number of block confirmations before forwarding the
   // event to the emitter. confirmations=1 skips the wait entirely.
+  // On timeout or provider teardown the event is emitted best-effort rather than dropped.
   private async emitAfterConfirmations(txHash: string, event: CloudEvent, label: string): Promise<void> {
     if (this.confirmations > 1) {
-      await this.provider.waitForTransaction(txHash, this.confirmations);
+      try {
+        await this.provider.waitForTransaction(txHash, this.confirmations, 120_000);
+      } catch {
+        // Timeout or provider destroyed — emit best-effort with the data we already have.
+      }
     }
     this.emitter.emit(event).catch((err) => {
       this.log.error({ err, registry: this.registryAddress }, `Failed to emit ${label} event`);

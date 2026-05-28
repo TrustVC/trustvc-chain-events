@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { CloudEvent, NormalizedLog } from '../interfaces/cloud-event.js';
+import { hexToUtf8 } from '../utils/eth.js';
 
 const BURN_ADDRESS = '0x000000000000000000000000000000000000dEaD';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -86,7 +87,7 @@ export function normalizeRegistryPause(
       transactionHash: norm.transactionHash,
       logIndex: norm.logIndex,
       idempotencyKey: `${chainId}-${norm.transactionHash}-${norm.logIndex}`,
-      payload: { remark },
+      payload: { remark: hexToUtf8(remark) },
     },
   };
 }

@@ -286,6 +286,20 @@ export class FactoryListener {
     this.log.info({ chain: this.chainKey, registry: address }, 'Registry resync complete');
   }
 
+  removeWatchedRegistry(address: string): void {
+    const key = address.toLowerCase();
+    this.watchedRegistries.delete(key);
+    // Stop and remove all escrow listeners belonging to this registry.
+    for (const [escrowKey, listener] of this.escrowListeners) {
+      const info = this.knownEscrows.get(escrowKey);
+      if (info?.registryAddr.toLowerCase() === key) {
+        listener.stop();
+        this.escrowListeners.delete(escrowKey);
+        this.knownEscrows.delete(escrowKey);
+      }
+    }
+  }
+
   stop(): void {
     this.contract.removeAllListeners();
     for (const listener of this.escrowListeners.values()) {

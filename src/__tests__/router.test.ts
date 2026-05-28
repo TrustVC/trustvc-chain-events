@@ -64,7 +64,7 @@ describe('createRouter', () => {
     const req = makeReq('DELETE', '/registry/ethereum-sepolia/0xabc');
     const res = makeRes();
     await dispatch(req, res);
-    expect(m.handleDeleteRegistry).toHaveBeenCalledWith(req, res);
+    expect(m.handleDeleteRegistry).toHaveBeenCalledWith(req, res, mockOrchestrator);
   });
 
   it('DELETE /registry/ prefix (any sub-path) dispatches to handleDeleteRegistry', async () => {

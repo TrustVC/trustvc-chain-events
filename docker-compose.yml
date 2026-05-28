@@ -13,10 +13,3 @@ services:
       CONFIG_PATH: /app/config.json
       OTEL_EXPORTER_OTLP_ENDPOINT: http://trustvc-lgtm:4318
     restart: unless-stopped
-    networks:
-      - trustvc-otel
-
-networks:
-  trustvc-otel:
-    external: true
-    name: trustvc-otel

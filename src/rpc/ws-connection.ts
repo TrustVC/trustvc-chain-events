@@ -73,7 +73,6 @@ export class WsConnection extends EventEmitter {
         provider = ws;
       } else {
         provider = new JsonRpcProvider(this.rpcUrl);
-        await (provider as JsonRpcProvider).getBlockNumber();
       }
 
       this.provider = provider;

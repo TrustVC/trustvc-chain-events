@@ -88,6 +88,9 @@ process.once('message', async (raw: unknown) => {
           const msg = err instanceof Error ? err.message : String(err);
           log.error({ err: msg, address: m.address }, 'addRegistry failed in worker');
         });
+    } else if (m.type === 'removeRegistry') {
+      manager.removeRegistry(m.address);
+      send({ type: 'registryRemoved', address: m.address });
     }
   });
 

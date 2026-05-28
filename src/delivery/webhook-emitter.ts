@@ -27,9 +27,6 @@ const deliveryDuration = meter.createHistogram('trustvc.webhook.delivery_duratio
 const queueDepth = meter.createObservableGauge('trustvc.webhook.queue_depth', {
   description: 'Events currently waiting in the delivery queue',
 });
-const chainEventsReceived = meter.createCounter('trustvc.chain.events_received', {
-  description: 'On-chain events detected and enqueued for delivery, by chain and event type',
-});
 
 export function createWebhookEmitter(
   config: WebhookConfig,
@@ -142,7 +139,6 @@ export function createWebhookEmitter(
   }
 
   function emit(event: CloudEvent): Promise<DeliveryResult> {
-    const eventAttrs = { chain: event.data.chainKey, event_type: event.type };
     if (pending.length >= MAX_QUEUE) {
       failedCounter.add(1, { event_type: event.type });
       log.error(
@@ -151,7 +147,6 @@ export function createWebhookEmitter(
       );
       return Promise.resolve({ success: false, attempts: 0, durationMs: 0, error: 'queue full' });
     }
-    chainEventsReceived.add(1, eventAttrs);
     pending.push(event);
     scheduleWorker();
     return Promise.resolve({ success: true, attempts: 0, durationMs: 0 });

@@ -52,4 +52,8 @@ export class ChainManager {
   async addRegistry(address: string, fromBlock: number): Promise<void> {
     await this.transport.addRegistry(address, fromBlock);
   }
+
+  removeRegistry(address: string): void {
+    this.transport.removeRegistry(address);
+  }
 }

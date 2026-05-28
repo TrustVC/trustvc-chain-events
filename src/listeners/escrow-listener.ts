@@ -78,7 +78,11 @@ export class EscrowListener {
   private async deliverEvent(event: CloudEvent, eventName: string, txHash: string): Promise<void> {
     eventsReceived.add(1, { chain: this.chainKey, event_type: eventName });
     if (this.confirmations > 1) {
-      await this.provider.waitForTransaction(txHash, this.confirmations);
+      try {
+        await this.provider.waitForTransaction(txHash, this.confirmations, 120_000);
+      } catch {
+        // Timeout or provider destroyed — emit best-effort with the data we already have.
+      }
     }
     this.emitter.emit(event).catch((err) => {
       this.log.error({ err, event: eventName, escrow: this.escrowAddress }, 'Failed to emit escrow event');

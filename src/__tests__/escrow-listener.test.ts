@@ -122,7 +122,7 @@ describe('EscrowListener', () => {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
-    expect(m.waitForTransaction).toHaveBeenCalledWith('0xtx', 2);
+    expect(m.waitForTransaction).toHaveBeenCalledWith('0xtx', 2, 120_000);
   });
 
   it('does not emit when normalizeEscrowEvent returns null', async () => {
