@@ -13,38 +13,43 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6.4.0
         with:
           node-version: '22'
           cache: 'npm'
 
       - run: npm ci
 
-      - name: Lint commit messages (PR range)
-        if: github.event_name == 'pull_request'
+      - name: Lint commit messages
         run: |
-          npx commitlint \
-            --from "${{ github.event.pull_request.base.sha }}" \
-            --to   "${{ github.event.pull_request.head.sha }}" \
-            --verbose
-
-      - name: Lint commit messages (last push commit)
-        if: github.event_name == 'push'
-        run: npx commitlint --last --verbose
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npx commitlint \
+              --from "${{ github.event.pull_request.base.sha }}" \
+              --to   "${{ github.event.pull_request.head.sha }}" \
+              --verbose
+          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            # First push to a new branch — no previous commit to range from
+            npx commitlint --last --verbose
+          else
+            npx commitlint \
+              --from "${{ github.event.before }}" \
+              --to   "${{ github.sha }}" \
+              --verbose
+          fi
 
   lint-and-build:
     name: Lint, type-check & build
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: '22'
           cache: 'npm'
