@@ -2,6 +2,16 @@
 
 By default the sidecar is designed as a **single-replica** service — one container per deployment is the recommended starting point. When you need fault tolerance or zero-downtime across availability zones, PostgreSQL-backed distributed leasing is built in.
 
+> **⚠️ Important — Scaling and HA require a database**
+>
+> Running more than one replica **requires PostgreSQL** (`DB_HOST` must be set). Without it, every replica polls the chain independently and your webhook endpoint receives **duplicate events** — one copy per replica, for every on-chain action.
+>
+> The database solves this in two ways:
+> - **One replica owns each chain at a time** — replicas compete for a lease stored in `chain_leases`. Only the winner polls; the others wait on standby.
+> - **Progress survives restarts** — the last processed block is persisted in `block_progress`, so a restarting replica picks up exactly where it left off instead of replaying from scratch.
+>
+> Without a database you can only run a **single replica** safely.
+
 ---
 
 ## How It Works
