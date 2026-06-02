@@ -67,8 +67,16 @@ Minimal `config.json`:
 
 #### Using the published Docker image (recommended)
 
+> **Recommended:** pull from Docker Hub
+
 ```bash
 docker pull trustvc/trustvc-chain-events:latest
+```
+
+> Also available on GitHub Container Registry (GHCR):
+
+```bash
+docker pull ghcr.io/trustvc/trustvc-chain-events:latest
 ```
 
 Two things are supplied at runtime — nothing is baked into the image:
