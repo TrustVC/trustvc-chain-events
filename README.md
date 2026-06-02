@@ -68,7 +68,7 @@ Minimal `config.json`:
 #### Using the published Docker image (recommended)
 
 ```bash
-docker pull ghcr.io/trustvc/trustvc-chain-events:latest
+docker pull trustvc/trustvc-chain-events:latest
 ```
 
 Two things are supplied at runtime — nothing is baked into the image:
@@ -85,7 +85,7 @@ docker run -d \
   -v $(pwd)/config.json:/app/config.json:ro \
   --env-file .env \
   -p 8080:8080 \
-  ghcr.io/trustvc/trustvc-chain-events:latest
+  trustvc/trustvc-chain-events:latest
 ```
 
 **Option B — inline flags**
@@ -97,7 +97,7 @@ docker run -d \
   -e DB_HOST=your-postgres-host \
   -e DB_PASSWORD=secret \
   -p 8080:8080 \
-  ghcr.io/trustvc/trustvc-chain-events:latest
+  trustvc/trustvc-chain-events:latest
 ```
 
 **Option C — Docker Compose**
@@ -105,7 +105,7 @@ docker run -d \
 ```yaml
 services:
   webhook-events:
-    image: ghcr.io/trustvc/trustvc-chain-events:latest
+    image: trustvc/trustvc-chain-events:latest
     ports:
       - "8080:8080"
     volumes:

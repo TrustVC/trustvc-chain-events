@@ -96,16 +96,17 @@ jobs:
       packages: write   # push to GHCR
 
     env:
-      TAG:  ${{ needs.version.outputs.tag }}
-      PREV: ${{ needs.version.outputs.previous }}
+      TAG:            ${{ needs.version.outputs.tag }}
+      PREV:           ${{ needs.version.outputs.previous }}
+      DOCKERHUB_IMAGE: trustvc/trustvc-chain-events
 
     steps:
       - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
-      - name: Set lowercase image name
-        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: Set GHCR image name
+        run: echo "GHCR_IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - uses: actions/download-artifact@v8.0.1
         with:
@@ -121,10 +122,10 @@ jobs:
           fi
 
           node - << 'SCRIPT'
-          const fs   = require('fs');
-          const tag   = process.env.TAG;
-          const image = process.env.IMAGE;
-          const repo  = process.env.GITHUB_REPOSITORY;
+          const fs            = require('fs');
+          const tag           = process.env.TAG;
+          const dockerhubImage = process.env.DOCKERHUB_IMAGE;
+          const repo          = process.env.GITHUB_REPOSITORY;
 
           // Parse commits
           const raw = fs.readFileSync('commits.txt', 'utf8').trim();
@@ -169,7 +170,7 @@ jobs:
 
           // Docker block
           notes += `## Docker Image\n\n`;
-          notes += `\`\`\`bash\ndocker pull ${image}:${tag}\n\`\`\`\n\n`;
+          notes += `\`\`\`bash\ndocker pull ${dockerhubImage}:${tag}\n\`\`\`\n\n`;
           notes += `Full setup: [README](https://github.com/${repo}/blob/main/README.md)\n`;
 
           fs.writeFileSync('release-notes.md', notes);
@@ -182,6 +183,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.1.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4.2.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v4.2.0
@@ -197,10 +204,12 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ env.TAG }}
-            ${{ env.IMAGE }}:latest
+            ${{ env.DOCKERHUB_IMAGE }}:${{ env.TAG }}
+            ${{ env.DOCKERHUB_IMAGE }}:latest
+            ${{ env.GHCR_IMAGE }}:${{ env.TAG }}
+            ${{ env.GHCR_IMAGE }}:latest
           labels: |
-            org.opencontainers.image.title=trustvc-webhook-events
+            org.opencontainers.image.title=trustvc-chain-events
             org.opencontainers.image.version=${{ env.TAG }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
