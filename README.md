@@ -374,9 +374,3 @@ npm test              # unit tests (Vitest)
 npm run check         # ESLint + Prettier + tsc --noEmit
 npm run fix           # auto-fix lint and format issues
 ```
-
----
-
-## License
-
-Copyright 2024 TrustVC — [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0)
