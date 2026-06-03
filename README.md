@@ -299,7 +299,8 @@ function verifyTrustVCWebhook(rawBody: Buffer, signatureHeader: string): boolean
 
 ## Registry API
 
-Requires `DB_HOST`. All endpoints return `503` when no database is configured.
+> [!WARNING]
+> **Requires a database.** Set `DB_HOST` to enable this API. All endpoints return `503` when no database is configured.
 
 ### POST /registry — add a registry at runtime
 
