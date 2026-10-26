@@ -4,7 +4,7 @@
   "description": "Self-hosted webhook sidecar that streams TrustVC ETR on-chain events to downstream endpoints",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.23.4"
   },
   "main": "dist/index.js",
   "scripts": {

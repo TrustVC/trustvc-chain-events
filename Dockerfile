@@ -1,5 +1,9 @@
+# Base image is pinned to an exact patch release so rebuilds never reuse a stale
+# cached node:22-alpine. Bump this on each Node.js security release.
+ARG NODE_IMAGE=node:22.23.4-alpine
+
 # ── dev stage ────────────────────────────────────────────────────────────────
-FROM node:22-alpine AS dev
+FROM ${NODE_IMAGE} AS dev
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -7,7 +11,7 @@ RUN npm ci
 CMD ["npm", "run", "dev"]
 
 # ── builder stage ─────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -15,7 +19,7 @@ COPY . .
 RUN npm run build
 
 # ── production stage ──────────────────────────────────────────────────────────
-FROM node:22-alpine
+FROM ${NODE_IMAGE}
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev

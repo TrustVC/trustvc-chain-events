@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      operator_notice:
+        description: 'Action-required notice for self-hosting operators (Markdown, shown at the top of the release notes)'
+        required: false
+        default: ''
 
 jobs:
   # ── 1. Full CI gate ──────────────────────────────────────────────────────────
@@ -99,6 +104,7 @@ jobs:
       TAG:            ${{ needs.version.outputs.tag }}
       PREV:           ${{ needs.version.outputs.previous }}
       DOCKERHUB_IMAGE: trustvc/trustvc-chain-events
+      OPERATOR_NOTICE: ${{ inputs.operator_notice }}
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -153,7 +159,10 @@ jobs:
           const section = (title, items) =>
             items.length ? `### ${title}\n\n${items.map(i => `- ${i}`).join('\n')}\n\n` : '';
 
-          let notes = '## What\'s Changed\n\n';
+          let notes = '';
+          const notice = (process.env.OPERATOR_NOTICE || '').trim();
+          if (notice) notes += `## ⚠️ Action Required for Operators\n\n${notice}\n\n---\n\n`;
+          notes += '## What\'s Changed\n\n';
           notes += section('✨ New Features',    groups.feat);
           notes += section('🐛 Bug Fixes',        groups.fix);
           notes += section('⚡ Performance',      groups.perf);
@@ -202,6 +211,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
+          pull: true
           push: true
           tags: |
             ${{ env.DOCKERHUB_IMAGE }}:${{ env.TAG }}
