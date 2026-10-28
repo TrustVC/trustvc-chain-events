@@ -239,3 +239,14 @@ jobs:
           tag_name: ${{ env.TAG }}
           name: ${{ env.TAG }}
           body_path: release-notes.md
+
+      # Runs last so a description failure never blocks the tag or release.
+      - name: Update Docker Hub description
+        continue-on-error: true
+        uses: peter-evans/dockerhub-description@v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.DOCKERHUB_IMAGE }}
+          short-description: Streams TrustVC ETR on-chain events to your system as signed CloudEvents webhooks
+          readme-filepath: ./docs/DOCKERHUB.md
